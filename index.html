@@ -129,6 +129,7 @@
           <div class="toolbar-right">
             <input type="text" class="form-control" id="planilla-search"
               placeholder="🔍 Buscar CI o nombre…" oninput="renderPlanilla()" style="width:180px">
+            <button class="btn btn-secondary btn-sm" onclick="imprimirReporteOficialPlanilla()">🖨️ Imprimir Reporte</button>
             <button class="btn btn-success btn-sm" onclick="exportarPlanillaExcel()">📊 Exportar Excel</button>
           </div>
         </div>
@@ -450,6 +451,9 @@
 
 <!-- TOAST -->
 <div id="toast-container"></div>
+
+<!-- ÁREA IMPRESA REPORTE OFICIAL -->
+<div id="printable-report-area"></div>
 
 <script src="app.js"></script>
 </body>

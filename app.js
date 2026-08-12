@@ -2471,3 +2471,171 @@ function exportarPlanillaExcel() {
   toast('Planilla exportada a Excel correctamente', 'success');
 }
 
+/* ══════════════════════════════════════════════════════════════
+   REPORTE IMPRESO OFICIAL (PLANILLA DE MARCADO DE ASISTENCIA)
+   Estructura oficial idéntica al formato impreso con Firmas
+══════════════════════════════════════════════════════════════ */
+function imprimirReporteOficialPlanilla() {
+  const servicioId = document.getElementById('planilla-servicio')?.value || '';
+  const fechaInput = document.getElementById('planilla-fecha')?.value || new Date().toISOString().split('T')[0];
+  const search     = (document.getElementById('planilla-search')?.value || '').toLowerCase().trim();
+
+  let emps = filtrarEmpleados(servicioId, search);
+  if (!emps.length) {
+    toast('No hay empleados para generar el reporte', 'info');
+    return;
+  }
+
+  const [yStr, mStr, dStr] = fechaInput.split('-');
+  const fechaFmt = `${dStr}/${mStr}/${yStr}`;
+  const anio = parseInt(yStr, 10);
+  const mes = parseInt(mStr, 10);
+  const dia = parseInt(dStr, 10);
+  const svcNombre = servicioId ? getServicioNombre(servicioId) : 'SUBALCALDÍA DISTRITO N° 11 / HOSPITAL MPAL. BAJÍO';
+
+  let tableRows = '';
+  let idx = 1;
+
+  emps.forEach(emp => {
+    const rolesEmp = DB.roles.filter(r => r.empleadoId === emp.id && r.mes === mes && r.anio === anio);
+    let rolVal = '';
+    let rolRecUsado = null;
+    for (const rRec of rolesEmp) {
+      const val = rRec.dias ? rRec.dias[String(dia)] : '';
+      if (val) { rolVal = val; rolRecUsado = rRec; break; }
+    }
+    const hCustom = rolRecUsado ? { horaEnt: rolRecUsado.horarioEntrada, horaSal: rolRecUsado.horarioSalida } : null;
+    const res = calcularEstadoDia(emp, fechaInput, rolVal, hCustom);
+
+    // Buscar marcaciones separadas en mañana y tarde
+    const marcs = DB.marcaciones
+      .filter(m => String(m.ci).trim() === String(emp.ci).trim() && m.fecha === fechaInput)
+      .sort((a,b) => a.hora.localeCompare(b.hora));
+
+    let mEnt = '', mSal = '', tEnt = '', tSal = '';
+
+    if (marcs.length > 0) {
+      const mManana = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) < 14);
+      const mTarde  = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) >= 14);
+
+      if (mManana.length > 0) {
+        mEnt = mManana[0].hora.substring(0, 5);
+        if (mManana.length > 1) mSal = mManana[mManana.length - 1].hora.substring(0, 5);
+      }
+      if (mTarde.length > 0) {
+        tEnt = mTarde[0].hora.substring(0, 5);
+        if (mTarde.length > 1) tSal = mTarde[mTarde.length - 1].hora.substring(0, 5);
+      }
+
+      // Si no hubo distribución por horas pero hubo marcaciones
+      if (!mEnt && !tEnt && marcs.length >= 1) {
+        mEnt = marcs[0].hora.substring(0, 5);
+        if (marcs.length > 1) mSal = marcs[marcs.length - 1].hora.substring(0, 5);
+      }
+    }
+
+    const obsText = [
+      res.label ? res.label.replace(/[✓⏰❌🏖️☕🔁🤰]/g, '').trim() : '',
+      res.minsTardanza > 0 ? `+${res.minsTardanza}m` : '',
+      res.minsSalidaAnticipada > 0 ? `-${res.minsSalidaAnticipada}m` : ''
+    ].filter(Boolean).join(' ') || '—';
+
+    tableRows += `<tr>
+      <td style="text-align:center;font-weight:700;color:#1a2332">${idx}</td>
+      <td style="font-weight:700;font-family:'Courier New',monospace">${emp.ci || '—'}</td>
+      <td><strong>${emp.apellidoP} ${emp.apellidoM} ${emp.nombres}</strong> <span style="font-size:.65rem;color:#5d6d7e">/ Estructura</span></td>
+      <td style="font-size:.72rem">${emp.cargo || '—'}</td>
+      <td style="text-align:center;font-weight:600">${mEnt || ''}</td>
+      <td style="text-align:center;font-weight:600">${mSal || ''}</td>
+      <td style="text-align:center;font-weight:600">${tEnt || ''}</td>
+      <td style="text-align:center;font-weight:600">${tSal || ''}</td>
+      <td style="font-size:.7rem;color:#4a5568">${obsText}</td>
+    </tr>`;
+
+    idx++;
+  });
+
+  const printHTML = `
+    <div class="oficial-report-sheet">
+      <table class="report-header-table">
+        <tr>
+          <td style="width:50px">
+            <div class="report-logo-icon">H</div>
+          </td>
+          <td>
+            <div class="report-subtitle">Sistema de Control de Asistencia</div>
+            <div class="report-title-main">PLANILLA DE MARCADO</div>
+          </td>
+          <td class="report-code-badge">
+            N° Planilla: 012_${String(mes).padStart(2,'0')}<br>
+            <span style="font-size:.68rem;color:#5d6d7e;font-weight:500">Gestión 2026</span>
+          </td>
+        </tr>
+      </table>
+
+      <div class="report-meta-grid">
+        <div class="report-meta-item">
+          <label>Fecha:</label>
+          <span>${fechaFmt}</span>
+        </div>
+        <div class="report-meta-item">
+          <label>Servicio / Dependencia:</label>
+          <span>${svcNombre}</span>
+        </div>
+        <div class="report-meta-item" style="text-align:right">
+          <label>Código Estructura:</label>
+          <span style="font-size:.72rem;font-family:'Courier New',monospace">001-008-006-011-000</span>
+        </div>
+      </div>
+
+      <table class="data-table-report">
+        <thead>
+          <tr>
+            <th rowspan="2" style="width:34px">Nro.</th>
+            <th rowspan="2" style="width:85px">CI</th>
+            <th rowspan="2">NOMBRES Y APELLIDOS</th>
+            <th rowspan="2">CARGO</th>
+            <th colspan="2">MAÑANA</th>
+            <th colspan="2">TARDE</th>
+            <th rowspan="2" style="width:110px">OBSER.</th>
+          </tr>
+          <tr>
+            <th class="sub-th" style="width:42px">E</th>
+            <th class="sub-th" style="width:42px">S</th>
+            <th class="sub-th" style="width:42px">E</th>
+            <th class="sub-th" style="width:42px">S</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tableRows}
+        </tbody>
+      </table>
+
+      <div class="report-signatures">
+        <div style="font-size:.75rem;font-weight:600;color:#5d6d7e">${fechaFmt}</div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <div class="signature-title">Nombre del Responsable</div>
+        </div>
+        <div class="signature-box">
+          <div class="signature-line"></div>
+          <div class="signature-title">Firma del Responsable</div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Asignar al contenedor de impresión nativa
+  const printContainer = document.getElementById('printable-report-area');
+  if (printContainer) printContainer.innerHTML = printHTML;
+
+  // Abrir vista previa en Modal interactivo
+  openModal('🖨️ Reporte Oficial de Planilla de Marcado', `
+    <div style="max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #dce1e8;border-radius:8px">
+      ${printHTML}
+    </div>
+  `, [
+    { label: '🖨️ Imprimir Ahora', class: 'btn-primary', cb: () => { window.print(); } }
+  ]);
+}
+
