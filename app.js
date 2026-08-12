@@ -2493,67 +2493,150 @@ function imprimirReporteOficialPlanilla() {
   const dia = parseInt(dStr, 10);
   const svcNombre = servicioId ? getServicioNombre(servicioId) : 'SUBALCALDÍA DISTRITO N° 11 / HOSPITAL MPAL. BAJÍO';
 
+  let tableHeader = '';
   let tableRows = '';
-  let idx = 1;
 
-  emps.forEach(emp => {
-    const rolesEmp = DB.roles.filter(r => r.empleadoId === emp.id && r.mes === mes && r.anio === anio);
-    let rolVal = '';
-    let rolRecUsado = null;
-    for (const rRec of rolesEmp) {
-      const val = rRec.dias ? rRec.dias[String(dia)] : '';
-      if (val) { rolVal = val; rolRecUsado = rRec; break; }
-    }
-    const hCustom = rolRecUsado ? { horaEnt: rolRecUsado.horarioEntrada, horaSal: rolRecUsado.horarioSalida } : null;
-    const res = calcularEstadoDia(emp, fechaInput, rolVal, hCustom);
+  if (UI.planillaVista === 'detalle_mes' || UI.planillaVista === 'mes') {
+    // ═══ REPORTE DETALLE MENSUAL (E/S) COMPLETO DE TODO EL MES ═══
+    const numDias = new Date(anio, mes, 0).getDate();
 
-    // Buscar marcaciones separadas en mañana y tarde
-    const marcs = DB.marcaciones
-      .filter(m => String(m.ci).trim() === String(emp.ci).trim() && m.fecha === fechaInput)
-      .sort((a,b) => a.hora.localeCompare(b.hora));
+    tableHeader = `
+      <tr>
+        <th style="width:32px">N°</th>
+        <th style="width:75px">FECHA / DÍA</th>
+        <th style="width:75px">CI</th>
+        <th>NOMBRES Y APELLIDOS</th>
+        <th>CARGO</th>
+        <th style="width:38px">ROL</th>
+        <th style="width:85px">H. PROGRAMADO</th>
+        <th style="width:55px">ENTRADA (E)</th>
+        <th style="width:55px">SALIDA (S)</th>
+        <th style="width:85px">ESTADO</th>
+        <th style="width:110px">OBSER. / RETRASO</th>
+      </tr>
+    `;
 
-    let mEnt = '', mSal = '', tEnt = '', tSal = '';
+    let n = 1;
+    emps.forEach(emp => {
+      const rolesEmp = DB.roles.filter(r => r.empleadoId === emp.id && r.mes === mes && r.anio === anio);
 
-    if (marcs.length > 0) {
-      const mManana = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) < 14);
-      const mTarde  = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) >= 14);
+      for (let d = 1; d <= numDias; d++) {
+        const dateStr = `${anio}-${String(mes).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        let rolVal = '';
+        let rolRecUsado = null;
+        for (const rRec of rolesEmp) {
+          const val = rRec.dias ? rRec.dias[String(d)] : '';
+          if (val) { rolVal = val; rolRecUsado = rRec; break; }
+        }
+        const hCustom = rolRecUsado ? { horaEnt: rolRecUsado.horarioEntrada, horaSal: rolRecUsado.horarioSalida } : null;
+        const res = calcularEstadoDia(emp, dateStr, rolVal, hCustom);
 
-      if (mManana.length > 0) {
-        mEnt = mManana[0].hora.substring(0, 5);
-        if (mManana.length > 1) mSal = mManana[mManana.length - 1].hora.substring(0, 5);
+        const dow = new Date(anio, mes - 1, d).getDay();
+        const obs = [
+          res.minsTardanza > 0 ? `Retraso +${res.minsTardanza}m` : '',
+          res.minsSalidaAnticipada > 0 ? `Salida ant. -${res.minsSalidaAnticipada}m` : '',
+        ].filter(Boolean).join(' / ') || '—';
+
+        const hProg = (res.horaEnt && res.horaSal) ? `${res.horaEnt} - ${res.horaSal}` : '—';
+        const eVal = res.entradaMarcada ? res.entradaMarcada : '—';
+        const sVal = res.salidaMarcada ? res.salidaMarcada : '—';
+
+        tableRows += `<tr>
+          <td style="text-align:center;font-weight:700">${n++}</td>
+          <td style="font-weight:700;white-space:nowrap">${String(d).padStart(2,'0')}/${String(mes).padStart(2,'0')} <span style="font-size:.65rem;color:#5d6d7e">(${DOW[dow]})</span></td>
+          <td style="font-family:'Courier New',monospace;font-weight:700">${emp.ci || '—'}</td>
+          <td><strong>${emp.apellidoP} ${emp.apellidoM} ${emp.nombres}</strong></td>
+          <td style="font-size:.72rem">${emp.cargo || '—'}</td>
+          <td style="text-align:center;font-weight:700">${rolVal || '—'}</td>
+          <td style="text-align:center;font-family:'Courier New',monospace;font-size:.72rem">${hProg}</td>
+          <td style="text-align:center;font-weight:700;color:${eVal!=='—'?'#1a7a5c':'#94a3b8'}">${eVal}</td>
+          <td style="text-align:center;font-weight:700;color:${sVal!=='—'?'#1a7a5c':'#94a3b8'}">${sVal}</td>
+          <td style="text-align:center;font-size:.7rem;font-weight:700">${res.label ? res.label.replace(/[✓⏰❌🏖️☕🔁🤰]/g, '').trim() : '—'}</td>
+          <td style="font-size:.68rem;color:#4a5568">${obs}</td>
+        </tr>`;
       }
-      if (mTarde.length > 0) {
-        tEnt = mTarde[0].hora.substring(0, 5);
-        if (mTarde.length > 1) tSal = mTarde[mTarde.length - 1].hora.substring(0, 5);
+    });
+
+  } else {
+    // ═══ REPORTE DIA INDIVIDUAL CON COLUMNAS MAÑANA / TARDE ═══
+    tableHeader = `
+      <tr>
+        <th rowspan="2" style="width:34px">Nro.</th>
+        <th rowspan="2" style="width:85px">CI</th>
+        <th rowspan="2">NOMBRES Y APELLIDOS</th>
+        <th rowspan="2">CARGO</th>
+        <th colspan="2">MAÑANA</th>
+        <th colspan="2">TARDE</th>
+        <th rowspan="2" style="width:110px">OBSER.</th>
+      </tr>
+      <tr>
+        <th class="sub-th" style="width:42px">E</th>
+        <th class="sub-th" style="width:42px">S</th>
+        <th class="sub-th" style="width:42px">E</th>
+        <th class="sub-th" style="width:42px">S</th>
+      </tr>
+    `;
+
+    let idx = 1;
+    emps.forEach(emp => {
+      const rolesEmp = DB.roles.filter(r => r.empleadoId === emp.id && r.mes === mes && r.anio === anio);
+      let rolVal = '';
+      let rolRecUsado = null;
+      for (const rRec of rolesEmp) {
+        const val = rRec.dias ? rRec.dias[String(dia)] : '';
+        if (val) { rolVal = val; rolRecUsado = rRec; break; }
+      }
+      const hCustom = rolRecUsado ? { horaEnt: rolRecUsado.horarioEntrada, horaSal: rolRecUsado.horarioSalida } : null;
+      const res = calcularEstadoDia(emp, fechaInput, rolVal, hCustom);
+
+      const marcs = DB.marcaciones
+        .filter(m => String(m.ci).trim() === String(emp.ci).trim() && m.fecha === fechaInput)
+        .sort((a,b) => a.hora.localeCompare(b.hora));
+
+      let mEnt = '', mSal = '', tEnt = '', tSal = '';
+
+      if (marcs.length > 0) {
+        const mManana = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) < 14);
+        const mTarde  = marcs.filter(m => parseInt(m.hora.split(':')[0], 10) >= 14);
+
+        if (mManana.length > 0) {
+          mEnt = mManana[0].hora.substring(0, 5);
+          if (mManana.length > 1) mSal = mManana[mManana.length - 1].hora.substring(0, 5);
+        }
+        if (mTarde.length > 0) {
+          tEnt = mTarde[0].hora.substring(0, 5);
+          if (mTarde.length > 1) tSal = mTarde[mTarde.length - 1].hora.substring(0, 5);
+        }
+
+        if (!mEnt && !tEnt && marcs.length >= 1) {
+          mEnt = marcs[0].hora.substring(0, 5);
+          if (marcs.length > 1) mSal = marcs[marcs.length - 1].hora.substring(0, 5);
+        }
       }
 
-      // Si no hubo distribución por horas pero hubo marcaciones
-      if (!mEnt && !tEnt && marcs.length >= 1) {
-        mEnt = marcs[0].hora.substring(0, 5);
-        if (marcs.length > 1) mSal = marcs[marcs.length - 1].hora.substring(0, 5);
-      }
-    }
+      const obsText = [
+        res.label ? res.label.replace(/[✓⏰❌🏖️☕🔁🤰]/g, '').trim() : '',
+        res.minsTardanza > 0 ? `+${res.minsTardanza}m` : '',
+        res.minsSalidaAnticipada > 0 ? `-${res.minsSalidaAnticipada}m` : ''
+      ].filter(Boolean).join(' ') || '—';
 
-    const obsText = [
-      res.label ? res.label.replace(/[✓⏰❌🏖️☕🔁🤰]/g, '').trim() : '',
-      res.minsTardanza > 0 ? `+${res.minsTardanza}m` : '',
-      res.minsSalidaAnticipada > 0 ? `-${res.minsSalidaAnticipada}m` : ''
-    ].filter(Boolean).join(' ') || '—';
+      tableRows += `<tr>
+        <td style="text-align:center;font-weight:700;color:#1a2332">${idx++}</td>
+        <td style="font-weight:700;font-family:'Courier New',monospace">${emp.ci || '—'}</td>
+        <td><strong>${emp.apellidoP} ${emp.apellidoM} ${emp.nombres}</strong> <span style="font-size:.65rem;color:#5d6d7e">/ Estructura</span></td>
+        <td style="font-size:.72rem">${emp.cargo || '—'}</td>
+        <td style="text-align:center;font-weight:600">${mEnt || ''}</td>
+        <td style="text-align:center;font-weight:600">${mSal || ''}</td>
+        <td style="text-align:center;font-weight:600">${tEnt || ''}</td>
+        <td style="text-align:center;font-weight:600">${tSal || ''}</td>
+        <td style="font-size:.7rem;color:#4a5568">${obsText}</td>
+      </tr>`;
+    });
+  }
 
-    tableRows += `<tr>
-      <td style="text-align:center;font-weight:700;color:#1a2332">${idx}</td>
-      <td style="font-weight:700;font-family:'Courier New',monospace">${emp.ci || '—'}</td>
-      <td><strong>${emp.apellidoP} ${emp.apellidoM} ${emp.nombres}</strong> <span style="font-size:.65rem;color:#5d6d7e">/ Estructura</span></td>
-      <td style="font-size:.72rem">${emp.cargo || '—'}</td>
-      <td style="text-align:center;font-weight:600">${mEnt || ''}</td>
-      <td style="text-align:center;font-weight:600">${mSal || ''}</td>
-      <td style="text-align:center;font-weight:600">${tEnt || ''}</td>
-      <td style="text-align:center;font-weight:600">${tSal || ''}</td>
-      <td style="font-size:.7rem;color:#4a5568">${obsText}</td>
-    </tr>`;
-
-    idx++;
-  });
+  const periodLabel = (UI.planillaVista === 'detalle_mes' || UI.planillaVista === 'mes')
+    ? `MES DE ${MESES[mes-1].toUpperCase()} DE ${anio}`
+    : `FECHA: ${fechaFmt}`;
 
   const printHTML = `
     <div class="oficial-report-sheet">
@@ -2567,7 +2650,7 @@ function imprimirReporteOficialPlanilla() {
             <div class="report-title-main">PLANILLA DE MARCADO</div>
           </td>
           <td class="report-code-badge">
-            N° Planilla: 012_${String(mes).padStart(2,'0')}<br>
+            N° Planilla: 012_11<br>
             <span style="font-size:.68rem;color:#5d6d7e;font-weight:500">Gestión 2026</span>
           </td>
         </tr>
@@ -2575,8 +2658,8 @@ function imprimirReporteOficialPlanilla() {
 
       <div class="report-meta-grid">
         <div class="report-meta-item">
-          <label>Fecha:</label>
-          <span>${fechaFmt}</span>
+          <label>Período / Fecha:</label>
+          <span>${periodLabel}</span>
         </div>
         <div class="report-meta-item">
           <label>Servicio / Dependencia:</label>
@@ -2590,21 +2673,7 @@ function imprimirReporteOficialPlanilla() {
 
       <table class="data-table-report">
         <thead>
-          <tr>
-            <th rowspan="2" style="width:34px">Nro.</th>
-            <th rowspan="2" style="width:85px">CI</th>
-            <th rowspan="2">NOMBRES Y APELLIDOS</th>
-            <th rowspan="2">CARGO</th>
-            <th colspan="2">MAÑANA</th>
-            <th colspan="2">TARDE</th>
-            <th rowspan="2" style="width:110px">OBSER.</th>
-          </tr>
-          <tr>
-            <th class="sub-th" style="width:42px">E</th>
-            <th class="sub-th" style="width:42px">S</th>
-            <th class="sub-th" style="width:42px">E</th>
-            <th class="sub-th" style="width:42px">S</th>
-          </tr>
+          ${tableHeader}
         </thead>
         <tbody>
           ${tableRows}
@@ -2630,12 +2699,12 @@ function imprimirReporteOficialPlanilla() {
   if (printContainer) printContainer.innerHTML = printHTML;
 
   // Abrir vista previa en Modal interactivo
-  openModal('🖨️ Reporte Oficial de Planilla de Marcado', `
+  openModal('🖨️ Reporte Oficial de Planilla de Marcado (N° 012_11)', `
     <div style="max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #dce1e8;border-radius:8px">
       ${printHTML}
     </div>
   `, [
-    { label: '🖨️ Imprimir Ahora', class: 'btn-primary', cb: () => { window.print(); } }
+    { label: '🖨️ Imprimir / Guardar PDF', class: 'btn-primary', cb: () => { window.print(); } }
   ]);
 }
 
