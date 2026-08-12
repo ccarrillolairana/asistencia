@@ -2475,7 +2475,7 @@ function exportarPlanillaExcel() {
    REPORTE IMPRESO OFICIAL (PLANILLA DE MARCADO DE ASISTENCIA)
    Estructura oficial idéntica al formato impreso con Firmas
 ══════════════════════════════════════════════════════════════ */
-function imprimirReporteOficialPlanilla() {
+function obtenerHTMLReporteOficial() {
   const servicioId = document.getElementById('planilla-servicio')?.value || '';
   const fechaInput = document.getElementById('planilla-fecha')?.value || new Date().toISOString().split('T')[0];
   const search     = (document.getElementById('planilla-search')?.value || '').toLowerCase().trim();
@@ -2483,7 +2483,7 @@ function imprimirReporteOficialPlanilla() {
   let emps = filtrarEmpleados(servicioId, search);
   if (!emps.length) {
     toast('No hay empleados para generar el reporte', 'info');
-    return;
+    return null;
   }
 
   const [yStr, mStr, dStr] = fechaInput.split('-');
@@ -2497,7 +2497,6 @@ function imprimirReporteOficialPlanilla() {
   let tableRows = '';
 
   if (UI.planillaVista === 'detalle_mes' || UI.planillaVista === 'mes') {
-    // ═══ REPORTE DETALLE MENSUAL (E/S) COMPLETO DE TODO EL MES ═══
     const numDias = new Date(anio, mes, 0).getDate();
 
     tableHeader = `
@@ -2558,7 +2557,6 @@ function imprimirReporteOficialPlanilla() {
     });
 
   } else {
-    // ═══ REPORTE DIA INDIVIDUAL CON COLUMNAS MAÑANA / TARDE ═══
     tableHeader = `
       <tr>
         <th rowspan="2" style="width:34px">Nro.</th>
@@ -2638,7 +2636,7 @@ function imprimirReporteOficialPlanilla() {
     ? `MES DE ${MESES[mes-1].toUpperCase()} DE ${anio}`
     : `FECHA: ${fechaFmt}`;
 
-  const printHTML = `
+  return `
     <div class="oficial-report-sheet">
       <table class="report-header-table">
         <tr>
@@ -2693,18 +2691,63 @@ function imprimirReporteOficialPlanilla() {
       </div>
     </div>
   `;
+}
 
-  // Asignar al contenedor de impresión nativa
+function imprimirReporteOficialPlanilla() {
+  const printHTML = obtenerHTMLReporteOficial();
+  if (!printHTML) return;
+
   const printContainer = document.getElementById('printable-report-area');
   if (printContainer) printContainer.innerHTML = printHTML;
 
-  // Abrir vista previa en Modal interactivo
   openModal('🖨️ Reporte Oficial de Planilla de Marcado (N° 012_11)', `
     <div style="max-height:70vh;overflow-y:auto;background:#fff;border:1px solid #dce1e8;border-radius:8px">
       ${printHTML}
     </div>
   `, [
-    { label: '🖨️ Imprimir / Guardar PDF', class: 'btn-primary', cb: () => { window.print(); } }
+    { label: '📄 Exportar a PDF', class: 'btn-success', cb: () => { closeModal(); exportarPlanillaPDF(); } },
+    { label: '🖨️ Imprimir Ahora', class: 'btn-primary', cb: () => { window.print(); } }
   ]);
+}
+
+function exportarPlanillaPDF() {
+  const printHTML = obtenerHTMLReporteOficial();
+  if (!printHTML) return;
+
+  const fechaInput = document.getElementById('planilla-fecha')?.value || new Date().toISOString().split('T')[0];
+  const [yStr, mStr, dStr] = fechaInput.split('-');
+  const mes = parseInt(mStr, 10);
+  const anio = parseInt(yStr, 10);
+
+  const element = document.createElement('div');
+  element.style.padding = '0';
+  element.style.background = '#ffffff';
+  element.innerHTML = printHTML;
+  document.body.appendChild(element);
+
+  const filename = `Planilla_Marcado_012_11_${UI.planillaVista === 'dia' ? fechaInput : `Mes_${MESES[mes-1]}_${anio}`}.pdf`;
+
+  if (window.html2pdf) {
+    toast('Generando y descargando PDF...', 'info');
+    const opt = {
+      margin:       [6, 6, 6, 6],
+      filename:     filename,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { scale: 2, useCORS: true, logging: false },
+      jsPDF:        { unit: 'mm', format: 'letter', orientation: 'landscape' }
+    };
+
+    window.html2pdf().set(opt).from(element).save().then(() => {
+      document.body.removeChild(element);
+      toast('Reporte PDF descargado correctamente', 'success');
+    }).catch(err => {
+      document.body.removeChild(element);
+      console.error(err);
+      window.print();
+    });
+  } else {
+    document.body.removeChild(element);
+    imprimirReporteOficialPlanilla();
+  }
 }
 

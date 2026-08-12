@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 </head>
 <body>
 
@@ -128,8 +129,9 @@
           </div>
           <div class="toolbar-right">
             <input type="text" class="form-control" id="planilla-search"
-              placeholder="🔍 Buscar CI o nombre…" oninput="renderPlanilla()" style="width:180px">
-            <button class="btn btn-secondary btn-sm" onclick="imprimirReporteOficialPlanilla()">🖨️ Imprimir Reporte</button>
+              placeholder="🔍 Buscar CI o nombre…" oninput="renderPlanilla()" style="width:170px">
+            <button class="btn btn-primary btn-sm" onclick="exportarPlanillaPDF()">📄 Exportar PDF</button>
+            <button class="btn btn-secondary btn-sm" onclick="imprimirReporteOficialPlanilla()">🖨️ Imprimir</button>
             <button class="btn btn-success btn-sm" onclick="exportarPlanillaExcel()">📊 Exportar Excel</button>
           </div>
         </div>
