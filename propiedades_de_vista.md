@@ -1,0 +1,29 @@
+# Propiedades de Vista - Reglas de Selects y Alertas
+
+1. **Búsqueda Tipeando (Search-by-typing):** Todos los select de filtrado y formulario en las vistas del sistema deben ser de tipo Select2 (o equivalente) y permitir que el usuario busque tipeando.
+2. **Carga mediante AJAX:** Los select deben configurarse para obtener datos dinámicamente mediante peticiones AJAX utilizando el controlador unificado `AjaxSearchController`.
+3. **Reutilización:** Antes de crear nuevos métodos de búsqueda por AJAX, se debe verificar el `AjaxSearchController` para reciclar código existente y evitar la duplicación de funciones de consulta.
+4. **Protección ante Doble Envío (Double Submit):** Todos los formularios de registro crítico deben incluir scripts o clases de protección (como inhabilitar botones con un spinner) para evitar dobles inserciones accidentales. Si la sumisión del formulario es interceptada por una confirmación SweetAlert2 (por ejemplo, el arqueo de caja), se debe añadir la clase `no-loader` al formulario para evitar que el cargador global bloquee el botón en caso de cancelación del usuario.
+5. **Alertas Premium (SweetAlert2):** En lugar de utilizar cuadros de diálogo nativos (`confirm()` o `alert()`) para confirmaciones destructivas o advertencias financieras de gran relevancia, se debe emplear **SweetAlert2** con estilos acordes al diseño corporativo (tonos verde jade o gris antracita).
+6. **Botones de Acciones Masivas (Excel/Carga):** Las interfaces de Productos, Clientes y Proveedores deben incluir un botón de "Acciones Masivas" (menú desplegable en Productos) o "Importar Masivo" en verde jade o verde oliva, posicionado de manera coherente al lado de las acciones primarias de creación.
+7. **Modales de Carga y Descarga de Plantillas**: Los modales de importación masiva deben incluir de forma destacada el botón/enlace para descargar la plantilla base correspondiente (`.xlsx`), facilitando al usuario el llenado adecuado de las columnas.
+8. **Visualización de Notificaciones de Error en Indexes**: Todas las vistas de catálogo principal (index.blade.php) deben incluir secciones para capturar y mostrar notificaciones de sesión de tipo `session('error')` en formato banner de alerta Bootstrap, alertando detalladamente si existieron registros rechazados o con formato inválido al realizar cargas masivas.
+9. **Diseño Responsivo y Tablas Adaptables:**
+   - Todas las vistas del sistema deben cargarse incluyendo la versión actualizada del archivo de estilos corporativos (`custom_erp.css?v=3`) para forzar la invalidación del caché local.
+   - Las cabeceras de tarjeta (`.card-header`) deben estructurarse usando Bootstrap Flex responsivo (`d-flex justify-content-between align-items-center flex-wrap` con margen `m-0`) para evitar que el título y los botones de acción se sobrepongan.
+   - Las tablas complejas deben disponer de scroll horizontal automático en pantallas móviles (`max-width: 768px`) mediante la regla global de adaptabilidad en `custom_erp.css`.
+   - En el Punto de Venta (POS), los grids de catálogo deben usar límites flex y anchos mínimos neutralizados (`min-width: 0`) para permitir el escalado limpio de la canasta, y los botones de checkout en móviles deben apilarse colocando el botón de registro arriba y el de cierre abajo para facilidad de uso.
+10. **Seguridad y Control de Descuentos en el Punto de Venta (POS):**
+    - Los inputs para aplicar descuentos sobre la venta (descuento parcial por producto y descuento adicional general) deben protegerse en la vista mediante comprobación estricta de permisos.
+    - Se debe utilizar la directiva Blade `@cannot` para deshabilitar (`disabled`), estilizar con fondo gris (`#e9ecef`) y cursor de prohibición (`cursor: not-allowed`) el campo de descuento general `inpDescuentoTotal`.
+    - Los inputs de descuentos por cada ítem en el carrito deben enlazarse a variables JavaScript booleanas de permisos (e.g., `canDescuentoParcial`) y renderizarse con la propiedad `disabled` de forma condicional.
+    - Las rutinas de frontend en JS (`updateDisc` y `updateDescuentoTotal`) deben verificar de forma programática las banderas booleanas de permisos antes de efectuar cualquier recálculo para bloquear manipulaciones no autorizadas desde la consola del navegador.
+11. **Buscador AJAX y Exportación a Excel en Bitácora**:
+    - La bitácora de actividades debe incorporar filtros dinámicos (Usuario, Módulo) cargados asíncronamente mediante Select2 por AJAX contra `AjaxSearchController`.
+    - La búsqueda de texto libre debe incluir un retardo (debounce) de 450ms para optimizar consultas de red.
+    - Se debe incluir un botón de exportación "Exportar Excel" al lado del total de registros que redirija a la descarga del reporte `.xlsx` manteniendo los filtros aplicados en el cliente.
+    - Las marcas de tiempo e interfaces de visualización deben mostrar la fecha y hora configuradas bajo el huso horario oficial de Bolivia (America/La_Paz, GMT-4).
+12. **Impresión POS y Comprobantes Térmicos Responsivos**:
+    - Las plantillas de ticket térmico (Ventas, Recibos de Pago y Egresos de Caja) deben estructurarse con anchos relativos en porcentaje o unidades `em` en lugar de medidas absolutas (`px` o `cm`) para responder dinámicamente al parámetro de tamaño de letra de la impresora.
+    - El diseño de comprobantes (como el recibo de egreso operativo) debe incorporar las firmas de responsabilidad ("Entregado Por" y "Recibido Por") en disposición paralela horizontal (flotantes) en lugar de apiladas verticalmente, optimizando el consumo de papel y evitando saltos de línea incidentales en DomPDF.
+    - Se permite la actualización en caliente del formato de la impresora activa durante el turno de caja mediante un modal interactivo que guarda el cambio en la base de datos de la sesión, adaptando los comprobantes generados al instante.

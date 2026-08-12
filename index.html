@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Control de Asistencia — Hospital Municipal El Bajío</title>
+  <meta name="description" content="Sistema de control de asistencia con biométrico y rol de turnos — Hospital Municipal Distrital Bajío del Oriente">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ══════════════════════════════════════
+       SIDEBAR
+  ══════════════════════════════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge-wrap">
+        <div class="logo-badge">H</div>
+        <div>
+          <div class="logo-title">Asistencia HMB</div>
+          <div class="logo-sub">Hospital Mpal. Bajío</div>
+        </div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+
+      <button class="nav-item active" id="nav-planilla" onclick="switchModule('planilla')">
+        <span class="nav-icon">📋</span>Planilla de Marcado
+      </button>
+
+      <button class="nav-item" id="nav-rol" onclick="switchModule('rol')">
+        <span class="nav-icon">📅</span>Rol de Turnos
+      </button>
+
+      <div class="nav-section-label" style="margin-top:6px;">Gestión</div>
+
+      <button class="nav-item" id="nav-empleados" onclick="switchModule('empleados')">
+        <span class="nav-icon">👤</span>Empleados
+      </button>
+
+      <button class="nav-item" id="nav-servicios" onclick="switchModule('servicios')">
+        <span class="nav-icon">🏥</span>Servicios / Áreas
+      </button>
+
+      <div class="nav-section-label" style="margin-top:6px;">Datos</div>
+
+      <button class="nav-item" id="nav-biometrico" onclick="switchModule('biometrico')">
+        <span class="nav-icon">🔬</span>Biométrico
+        <span class="nav-badge" id="badge-marcaciones">0</span>
+      </button>
+
+      <button class="nav-item" id="nav-config" onclick="switchModule('config')">
+        <span class="nav-icon">⚙️</span>Configuración
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">v2.0 · Agosto 2026</div>
+  </aside>
+
+  <!-- ══════════════════════════════════════
+       MAIN CONTENT
+  ══════════════════════════════════════ -->
+  <div class="main-content">
+
+    <!-- TOPBAR -->
+    <div class="topbar">
+      <div id="topbar-title"><h2>📋 Planilla de Marcado</h2></div>
+      <div class="topbar-actions">
+        <span class="topbar-badge" id="topbar-info">Sin datos</span>
+        <button class="btn btn-secondary btn-sm no-print" onclick="window.print()">🖨️ Imprimir</button>
+      </div>
+    </div>
+
+    <!-- MODULE AREA -->
+    <div class="module-area">
+
+      <!-- ══════════════════════════════════
+           MOD 1: PLANILLA DE MARCADO
+      ══════════════════════════════════ -->
+      <div class="module active" id="mod-planilla">
+
+        <div class="stats-grid no-print">
+          <div class="stat-card primary">
+            <div class="stat-icon">👥</div>
+            <div><div class="stat-value" id="s-total">0</div><div class="stat-label">Personal</div></div>
+          </div>
+          <div class="stat-card success">
+            <div class="stat-icon">✅</div>
+            <div><div class="stat-value" id="s-presentes">0</div><div class="stat-label">Presentes</div></div>
+          </div>
+          <div class="stat-card warning">
+            <div class="stat-icon">⏰</div>
+            <div><div class="stat-value" id="s-tardanzas">0</div><div class="stat-label">Tardanzas</div></div>
+          </div>
+          <div class="stat-card danger">
+            <div class="stat-icon">❌</div>
+            <div><div class="stat-value" id="s-faltas">0</div><div class="stat-label">Faltas</div></div>
+          </div>
+          <div class="stat-card info">
+            <div class="stat-icon">🏖️</div>
+            <div><div class="stat-value" id="s-vacaciones">0</div><div class="stat-label">Vacaciones</div></div>
+          </div>
+          <div class="stat-card neutral">
+            <div class="stat-icon">☕</div>
+            <div><div class="stat-value" id="s-francos">0</div><div class="stat-label">Francos / Descansos</div></div>
+          </div>
+        </div>
+
+        <div class="toolbar no-print">
+          <div class="toolbar-left">
+            <select class="form-control" id="planilla-servicio" onchange="renderPlanilla()" style="width:195px">
+              <option value="">— Todos los servicios —</option>
+            </select>
+            <input type="date" class="form-control" id="planilla-fecha" style="width:148px" onchange="renderPlanilla()">
+            <div class="chip-group">
+              <div class="chip active" id="chip-dia" onclick="setPlanillaVista('dia')">Por Día</div>
+              <div class="chip" id="chip-mes" onclick="setPlanillaVista('mes')">Matriz Mensual</div>
+              <div class="chip" id="chip-detalle-mes" onclick="setPlanillaVista('detalle_mes')">📋 Detalle Mensual (E/S)</div>
+            </div>
+          </div>
+          <div class="toolbar-right">
+            <input type="text" class="form-control" id="planilla-search"
+              placeholder="🔍 Buscar CI o nombre…" oninput="renderPlanilla()" style="width:180px">
+            <button class="btn btn-success btn-sm" onclick="exportarPlanillaExcel()">📊 Exportar Excel</button>
+          </div>
+        </div>
+
+        <div class="legend no-print">
+          <span style="font-size:.7rem;font-weight:600;color:var(--text-muted);margin-right:4px;">Leyenda:</span>
+          <div class="legend-item"><div class="legend-dot badge-present">✓</div>Presente</div>
+          <div class="legend-item"><div class="legend-dot badge-late">⏰</div>Tardanza</div>
+          <div class="legend-item"><div class="legend-dot badge-absent">✗</div>Falta</div>
+          <div class="legend-item"><div class="legend-dot badge-vacation">V</div>Vacación</div>
+          <div class="legend-item"><div class="legend-dot badge-prenatal">PN</div>Prenatal</div>
+          <div class="legend-item"><div class="legend-dot badge-franco">F</div>Franco (Descanso)</div>
+          <div class="legend-item"><div class="legend-dot badge-cambio">C</div>Cambio</div>
+          <div class="legend-item"><div class="legend-dot badge-t12">12</div>Guardia 12h</div>
+          <div class="legend-item"><div class="legend-dot badge-sinrol">—</div>Sin Rol</div>
+        </div>
+
+        <!-- Print header -->
+        <div class="print-header">
+          <h2 id="p-hosp">HOSPITAL MUNICIPAL DISTRITAL BAJÍO DEL ORIENTE</h2>
+          <h3>SISTEMA DE CONTROL DE ASISTENCIA</h3>
+          <p id="print-label">PLANILLA DE MARCADO</p>
+        </div>
+
+        <div class="card">
+          <div class="card-body" id="planilla-body">
+            <div class="empty-state">
+              <span class="empty-icon">📋</span>
+              <h3>Selecciona un servicio y fecha</h3>
+              <p>Carga los datos del biométrico y define el rol de turnos para ver la planilla.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════
+           MOD 2: ROL DE TURNOS
+      ══════════════════════════════════ -->
+      <div class="module" id="mod-rol">
+
+        <div class="toolbar no-print">
+          <div class="toolbar-left">
+            <select class="form-control" id="rol-servicio" onchange="renderRolGrid()" style="width:195px">
+              <option value="">— Seleccionar servicio —</option>
+            </select>
+            <select class="form-control" id="rol-mes" onchange="renderRolGrid()" style="width:115px"></select>
+            <select class="form-control" id="rol-anio" onchange="renderRolGrid()" style="width:85px"></select>
+            <input type="text" class="form-control" id="rol-search"
+              placeholder="🔍 Buscar CI o nombre…" oninput="renderRolGrid()" style="width:175px">
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" onclick="exportarPlantillaRolExcel()" title="Descargar plantilla de ejemplo de Rol de Turnos en Excel">📄 Descargar Plantilla</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalRolManual()">+ Asignar Rol Manual</button>
+            <button class="btn btn-secondary btn-sm" onclick="clonarRolMesAnterior()">🔁 Clonar mes ant.</button>
+            <button class="btn btn-warning btn-sm" onclick="importarRolExcelBtn()">📥 Importar Excel</button>
+            <button class="btn btn-success btn-sm" onclick="guardarRolActual()">💾 Guardar</button>
+            <input type="file" id="file-rol" accept=".xlsx,.xls" style="display:none" onchange="handleRolImport(event)">
+          </div>
+        </div>
+
+        <div class="legend no-print">
+          <span style="font-size:.7rem;font-weight:600;color:var(--text-muted);margin-right:4px;">Clic para cambiar:</span>
+          <div class="legend-item"><div class="legend-dot rol-6">6</div>Turno 6h</div>
+          <div class="legend-item"><div class="legend-dot rol-12">12</div>Guardia 12h</div>
+          <div class="legend-item"><div class="legend-dot rol-C">C</div>Cambio</div>
+          <div class="legend-item"><div class="legend-dot rol-F">F</div>Franco (Descanso)</div>
+          <div class="legend-item"><div class="legend-dot rol-T">T</div>Turno Esp.</div>
+          <div class="legend-item"><div class="legend-dot rol-V">V</div>Vacación</div>
+          <div class="legend-item"><div class="legend-dot rol-PN">PN</div>Prenatal</div>
+          <div class="legend-item"><div class="legend-dot rol-empty">·</div>Libre</div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📅 Grilla de Rol Mensual</span>
+            <span id="rol-periodo-label" class="text-muted text-sm"></span>
+          </div>
+          <div class="card-body" style="padding:0">
+            <div id="rol-grid-body">
+              <div class="empty-state">
+                <span class="empty-icon">📅</span>
+                <h3>Selecciona un servicio y periodo</h3>
+                <p>Haz clic en cada celda para asignar el tipo de turno. Los cambios se guardan automáticamente.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════
+           MOD 3: EMPLEADOS
+      ══════════════════════════════════ -->
+      <div class="module" id="mod-empleados">
+
+        <div class="toolbar no-print">
+          <div class="toolbar-left">
+            <select class="form-control" id="emp-filtro-srv" onchange="renderEmpleados()" style="width:195px">
+              <option value="">— Todos los servicios —</option>
+            </select>
+            <input type="text" class="form-control" id="emp-search"
+              placeholder="🔍 Buscar CI o nombre…" oninput="renderEmpleados()" style="width:195px">
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-secondary btn-sm" onclick="exportarPlantillaEmpleadosExcel()">📄 Descargar Plantilla</button>
+            <button class="btn btn-secondary btn-sm" onclick="importarEmpExcelBtn()">📥 Importar desde Excel Rol</button>
+            <button class="btn btn-primary btn-sm" onclick="abrirModalEmpleado()">+ Nuevo Empleado</button>
+            <input type="file" id="file-emp" accept=".xlsx,.xls" style="display:none" onchange="handleEmpImport(event)">
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">👤 Nómina de Personal</span>
+            <span id="emp-count" class="text-muted text-sm">0 empleados</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:38px">N°</th>
+                  <th>CI</th>
+                  <th>Apellidos y Nombres</th>
+                  <th>Cargo</th>
+                  <th>Servicio</th>
+                  <th style="text-align:center">Horario Normal (6h)</th>
+                  <th style="text-align:center">Horario Guardia (12h)</th>
+                  <th>Celular</th>
+                  <th style="width:80px">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-empleados"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════
+           MOD 4: SERVICIOS
+      ══════════════════════════════════ -->
+      <div class="module" id="mod-servicios">
+
+        <div class="toolbar no-print">
+          <div class="toolbar-left">
+            <input type="text" class="form-control" id="srv-search"
+              placeholder="🔍 Buscar servicio o jefe…" oninput="renderServicios()" style="width:230px">
+          </div>
+          <div class="toolbar-right">
+            <button class="btn btn-primary btn-sm" onclick="abrirModalServicio()">+ Nuevo Servicio</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">🏥 Servicios y Áreas del Hospital</span>
+            <span id="srv-count" class="text-muted text-sm">0 servicios</span>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:38px">N°</th>
+                  <th>Nombre del Servicio / Área</th>
+                  <th>Jefe de Servicio</th>
+                  <th style="text-align:center">N° Empleados</th>
+                  <th style="width:110px">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-servicios"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════
+           MOD 5: BIOMÉTRICO
+      ══════════════════════════════════ -->
+      <div class="module" id="mod-biometrico">
+
+        <div class="stats-grid no-print">
+          <div class="stat-card primary">
+            <div class="stat-icon">📊</div>
+            <div><div class="stat-value" id="bio-total">0</div><div class="stat-label">Marcaciones</div></div>
+          </div>
+          <div class="stat-card info">
+            <div class="stat-icon">👥</div>
+            <div><div class="stat-value" id="bio-personas">0</div><div class="stat-label">Personas únicas</div></div>
+          </div>
+          <div class="stat-card neutral">
+            <div class="stat-icon">📅</div>
+            <div><div class="stat-value" id="bio-rango" style="font-size:1rem;">—</div><div class="stat-label">Periodo</div></div>
+          </div>
+        </div>
+
+        <div class="card mb-3">
+          <div class="card-header">
+            <span class="card-title">🔬 Cargar Datos del Biométrico</span>
+          </div>
+          <div class="card-body">
+            <div class="alert alert-info mb-2">
+              ℹ️ El Excel debe tener las columnas: <code>CI</code> <code>NombreCompleto</code> <code>IDED</code> <code>nombreedif</code> <code>FECHAMARCAD</code> <code>HORAMARCAD</code>
+            </div>
+            <div class="dropzone" id="bio-dropzone" onclick="document.getElementById('file-bio').click()">
+              <span class="dropzone-icon">🔬</span>
+              <h3>Arrastra el archivo del biométrico aquí</h3>
+              <p>o haz clic para seleccionar (.xlsx, .xls)</p>
+              <input type="file" id="file-bio" accept=".xlsx,.xls" style="display:none" onchange="handleBioUpload(event)">
+            </div>
+            <div id="bio-status" style="margin-top:12px;text-align:center;font-weight:600;"></div>
+            <div class="progress-bar mt-2" id="bio-progress" style="display:none">
+              <div class="fill" id="bio-prog-fill" style="width:0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <span class="card-title">📋 Últimas Marcaciones Cargadas</span>
+            <div class="flex-gap">
+              <input type="text" class="form-control" id="bio-search"
+                placeholder="🔍 Buscar CI, nombre o lugar…" oninput="renderBioPreview()" style="width:230px">
+              <button class="btn btn-danger btn-sm" onclick="limpiarMarcaciones()">🗑️ Limpiar todo</button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:38px">N°</th>
+                  <th>CI</th>
+                  <th>Nombre Completo</th>
+                  <th>IDED</th>
+                  <th>Edificio / Lugar</th>
+                  <th>Fecha</th>
+                  <th>Hora</th>
+                </tr>
+              </thead>
+              <tbody id="tbody-bio"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ══════════════════════════════════
+           MOD 6: CONFIGURACIÓN
+      ══════════════════════════════════ -->
+      <div class="module" id="mod-config">
+        <div style="max-width:600px">
+
+          <div class="card mb-3">
+            <div class="card-header">
+              <span class="card-title">⚙️ Parámetros de Asistencia</span>
+            </div>
+            <div class="card-body">
+              <div class="alert alert-info mb-2">
+                ℹ️ Estas reglas aplican a todo el hospital para el cálculo de tardanzas y faltas.
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tolerancia de Entrada (minutos)</label>
+                <input type="number" class="form-control" id="cfg-entrada" min="0" max="60" value="5">
+                <div class="form-hint">El personal puede llegar hasta <b>N min</b> después de su horario sin marcar tardanza.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Tolerancia de Salida Anticipada (minutos)</label>
+                <input type="number" class="form-control" id="cfg-salida" min="0" max="120" value="60">
+                <div class="form-hint">El personal puede marcar salida hasta <b>N min antes</b> de su hora de salida. Pasado ese límite = salida anticipada.</div>
+              </div>
+              <hr class="divider">
+              <div class="form-group">
+                <label class="form-label">Nombre del Hospital</label>
+                <input type="text" class="form-control" id="cfg-hospital" value="Hospital Municipal Distrital Bajío del Oriente">
+              </div>
+              <div class="form-group">
+                <label class="form-label">N° de Planilla (para impresión)</label>
+                <input type="text" class="form-control" id="cfg-planilla" value="026_5">
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:14px">
+                <button class="btn btn-primary" onclick="guardarConfig()">💾 Guardar Configuración</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <span class="card-title">🗄️ Gestión de Datos</span>
+            </div>
+            <div class="card-body">
+              <div class="flex-gap" style="flex-wrap:wrap;gap:10px">
+                <button class="btn btn-secondary" onclick="exportarBackup()">⬇️ Exportar backup JSON</button>
+                <button class="btn btn-secondary" onclick="document.getElementById('file-backup').click()">⬆️ Restaurar backup</button>
+                <button class="btn btn-danger" onclick="resetearDatos()">⚠️ Resetear todos los datos</button>
+              </div>
+              <input type="file" id="file-backup" accept=".json" style="display:none" onchange="handleBackupImport(event)">
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /module-area -->
+  </div><!-- /main-content -->
+</div><!-- /app-layout -->
+
+<!-- ══════════════════════════════════════
+     MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+  <div class="modal-box" id="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">—</span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="modal-save-btn" onclick="execModalSave()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast-container"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
